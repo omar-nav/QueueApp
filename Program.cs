@@ -9,17 +9,24 @@ namespace QueueApp
   {
     // use key vault instead
     private const string ConnectionString = "";
-    static void Main(string[] args)
+    static async void Main(string[] args)
     {
-      Console.WriteLine("Holi Mundo!");
+      if (args.Length > 0)
+      {
+        string value = String.Join(" ", args);
+        SendArticleAsync(value).Wait();
+        Console.WriteLine($"Sent: {value}");
+      }
+      else
+      {
+        // use Result property from the returning task
+        string value = await ReceiveArticleAsync();
+        Console.WriteLine($"Received {value}");
+      }
     }
     static async Task SendArticleAsync(string newsMessage)
     {
-      CloudStorageAccount storageAccount = CloudStorageAccount.Parse(ConnectionString);
-
-      CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
-
-      CloudQueue queue = queueClient.GetQueueReference("newsqueue");
+      CloudQueue queue = GetQueue();
       bool createdQueue = await queue.CreateIfNotExistsAsync();
       if (createdQueue)
       {
@@ -28,6 +35,29 @@ namespace QueueApp
 
       CloudQueueMessage articleMessage = new CloudQueueMessage(newsMessage);
       await queue.AddMessageAsync(articleMessage);
+    }
+    static async Task<string> ReceiveArticleAsync()
+    {
+      CloudQueue queue = GetQueue();
+      bool exists = await queue.ExistsAsync();
+      if (exists)
+      {
+        CloudQueueMessage retrievedArticle = await queue.GetMessageAsync();
+        if (retrievedArticle != null)
+        {
+          string newsMessage = retrievedArticle.AsString;
+          await queue.DeleteMessageAsync(retrievedArticle);
+          return newsMessage;
+        }
+      }
+
+      return "<queue empty or not created>";
+    }
+    static CloudQueue GetQueue()
+    {
+      CloudStorageAccount storageAccount = CloudStorageAccount.Parse(ConnectionString);
+      CloudQueueClient queueClient = storageAccount.CreateCloudQueueClient();
+      return queueClient.GetQueueReference("newsqueue33");
     }
   }
 }
